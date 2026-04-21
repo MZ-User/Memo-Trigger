@@ -1,5 +1,6 @@
 import os
 import json
+import sqlite3
 from datetime import datetime
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QFrame, QPushButton, 
                              QHBoxLayout, QListView, QStyledItemDelegate, 
@@ -7,7 +8,7 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QFrame, QPushButton,
 from PyQt6.QtCore import (Qt, QAbstractListModel, QModelIndex, QRect, 
                           QSize, pyqtSignal, QPoint)
 from PyQt6.QtGui import (QFont, QColor, QPixmap, QPainter, QPen, QAction, 
-                         QGuiApplication, QPainterPath, QFontDatabase)
+                          QGuiApplication, QPainterPath, QFontDatabase)
 
 # Boss, aapka preferred import path:
 from .Preview.img_preview import ImagePreviewOverlay
@@ -92,33 +93,27 @@ class FileDelegate(QStyledItemDelegate):
 
         base_y = rect.bottom()
         
-        # Readability boost using Text Shadows (simulated by drawing black offset text first)
+        # Readability boost using Text Shadows
         name_rect = QRect(rect.x() + 15, base_y - 85, rect.width() - 30, 35) 
         filename = os.path.basename(path)
         
         painter.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
-        # Shadow for name
         painter.setPen(QColor(0, 0, 0, 200))
         painter.drawText(name_rect.translated(1, 1), Qt.AlignmentFlag.AlignCenter | Qt.TextFlag.TextWordWrap, filename)
-        # Actual name
         painter.setPen(QColor("white"))
         painter.drawText(name_rect, Qt.AlignmentFlag.AlignCenter | Qt.TextFlag.TextWordWrap, filename)
         
         painter.setFont(QFont("Impact", 14))
         date_str = dt.strftime('%d-%m-%Y')
-        # Shadow for Date
         painter.setPen(QColor(0, 0, 0, 200))
         painter.drawText(rect.x() + 1, base_y - 44, rect.width(), 25, Qt.AlignmentFlag.AlignCenter, date_str)
-        # Actual Date
         painter.setPen(QColor("#FFFF00")) 
         painter.drawText(rect.x(), base_y - 45, rect.width(), 25, Qt.AlignmentFlag.AlignCenter, date_str)
         
         painter.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
         time_str = dt.strftime('%I:%M %p')
-        # Shadow for Time
         painter.setPen(QColor(0, 0, 0, 200))
         painter.drawText(rect.x() + 1, base_y - 19, rect.width(), 20, Qt.AlignmentFlag.AlignCenter, time_str)
-        # Actual Time
         painter.setPen(QColor("white"))
         painter.drawText(rect.x(), base_y - 20, rect.width(), 20, Qt.AlignmentFlag.AlignCenter, time_str)
         
@@ -131,7 +126,23 @@ class ResultsPage(QWidget):
     def __init__(self, parent):
         super().__init__(parent)
         self.parent = parent
+        self.db_name = "memo_trigger.db"
+        self.init_db() # Database initialize karna zrori hai
         self.init_ui()
+
+    def init_db(self):
+        """Boss, ye method database file aur table structure create karta hai agar wo exist na kare."""
+        conn = sqlite3.connect(self.db_name)
+        cursor = conn.cursor()
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS scan_results (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                file_path TEXT NOT NULL,
+                timestamp REAL NOT NULL
+            )
+        ''')
+        conn.commit()
+        conn.close()
 
     def init_ui(self):
         self.layout = QVBoxLayout(self)
@@ -144,7 +155,6 @@ class ResultsPage(QWidget):
         if font_id != -1:
             self.custom_font_family = QFontDatabase.applicationFontFamilies(font_id)[0]
         else:
-            # Fallback agar OTF ho ya file na mile
             otf_path = os.path.join("static", "fonts", "Gwenchana.otf")
             font_id_otf = QFontDatabase.addApplicationFont(otf_path)
             self.custom_font_family = QFontDatabase.applicationFontFamilies(font_id_otf)[0] if font_id_otf != -1 else "Impact"
@@ -153,7 +163,7 @@ class ResultsPage(QWidget):
         self.logo_container = QFrame()
         self.logo_container.setStyleSheet("""
             QFrame {
-                background-color: rgba(255, 255, 255, 180); /* Dim White Frosted Feel */
+                background-color: rgba(255, 255, 255, 180); 
                 border-radius: 20px;
                 border: 2px solid rgba(255, 255, 255, 50);
             }
@@ -183,7 +193,6 @@ class ResultsPage(QWidget):
                 background: transparent; 
                 border: none;
             }
-            /* Modern Neon Scrollbar */
             QScrollBar:vertical {
                 border: none;
                 background: rgba(0, 0, 0, 80);
@@ -192,7 +201,7 @@ class ResultsPage(QWidget):
                 margin: 0px 2px 0px 2px;
             }
             QScrollBar::handle:vertical {
-                background: rgba(0, 242, 255, 150); /* Cyan color */
+                background: rgba(0, 242, 255, 150); 
                 min-height: 30px;
                 border-radius: 4px;
             }
@@ -253,12 +262,10 @@ class ResultsPage(QWidget):
             self.view = QListView()
             self.view.setViewMode(QListView.ViewMode.IconMode)
             self.view.setSpacing(15)
-            
             self.view.setMinimumHeight(850) 
             self.view.setResizeMode(QListView.ResizeMode.Adjust) 
             self.view.setUniformItemSizes(True) 
             self.view.setGridSize(QSize(215, 265)) 
-            
             self.view.setStyleSheet("background: transparent; border: none; outline: none;")
             
             self.view.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -349,8 +356,7 @@ class ResultsPage(QWidget):
         img_container.setAlignment(Qt.AlignmentFlag.AlignCenter)
         v.addWidget(img_container)
         v.addStretch() 
-        
-        # Helper to add shadow for better readability
+
         def add_shadow(widget):
             shadow = QGraphicsDropShadowEffect(self)
             shadow.setBlurRadius(8)
@@ -367,7 +373,6 @@ class ResultsPage(QWidget):
         add_shadow(name)
         
         dt = datetime.fromtimestamp(item[1])
-        
         d_lbl = QLabel(dt.strftime('%d-%m-%Y'))
         d_lbl.setStyleSheet("color: #FFFF00; font-family: 'Impact'; font-size: 15px; border: none; background: transparent; letter-spacing: 1px;")
         d_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -436,8 +441,6 @@ class ResultsPage(QWidget):
             btn.setStyleSheet("background: #00F2FF; color: #001A33; border: 2px solid white; border-radius: 10px; font-weight: bold;")
         else:
             btn.setStyleSheet("background: rgba(255,255,255,10); color: white; border: 1px solid rgba(255,255,255,50); border-radius: 10px;")
-            
-        # Add quick hover effect to filter buttons
         btn.setProperty("active", active)
 
     def resort(self, rev):
@@ -446,31 +449,41 @@ class ResultsPage(QWidget):
         self.model.sort_data(rev)
 
     def load_data(self):
-        db_path = "DB.json"
-        if os.path.exists(db_path):
-            with open(db_path, 'r') as f:
-                paths = json.load(f).get("images", [])
-            
-            data = [(p, os.path.getctime(p)) for p in paths if os.path.exists(p)]
-            data.sort(key=lambda x: x[1])
-            
-            self.all_box['label'].setText(f"All Files ({len(data)})")
-            
-            self.model._all_data = data
-            self.model.load_more()
-            
-            # Clear old widgets in grid before re-loading to prevent overlap
-            for i in reversed(range(self.oldest_box['grid'].count())): 
-                self.oldest_box['grid'].itemAt(i).widget().setParent(None)
-            for i in reversed(range(self.latest_box['grid'].count())): 
-                self.latest_box['grid'].itemAt(i).widget().setParent(None)
+        """Boss, yahan se logic update hua hai DB ke liye."""
+        data = []
+        try:
+            conn = sqlite3.connect(self.db_name)
+            cursor = conn.cursor()
+            cursor.execute("SELECT file_path, timestamp FROM scan_results")
+            rows = cursor.fetchall()
+            # Validating paths and formatting for the model
+            data = [(r[0], r[1]) for r in rows if os.path.exists(r[0])]
+            conn.close()
+        except Exception as e:
+            print(f"Database Error: {e}")
+            # Fallback agar DB na mile to empty list
+            data = []
 
-            for i in range(min(4, len(data))):
-                self.oldest_box['grid'].addWidget(self.create_static_card(data[i], i, data), 0, i)
-            
-            latest_list = sorted(data, key=lambda x: x[1], reverse=True)
-            for i in range(min(4, len(latest_list))):
-                self.latest_box['grid'].addWidget(self.create_static_card(latest_list[i], i, latest_list), 0, i)
+        # UI Updates using fetched DB data
+        data.sort(key=lambda x: x[1])
+        self.all_box['label'].setText(f"All Files ({len(data)})")
+        
+        self.model._all_data = data
+        self.model._display_data = [] # Reset display data
+        self.model.load_more()
+        
+        # Grid clear logic (SAB UI CHEZEN SAME HAIN)
+        for i in reversed(range(self.oldest_box['grid'].count())): 
+            self.oldest_box['grid'].itemAt(i).widget().setParent(None)
+        for i in reversed(range(self.latest_box['grid'].count())): 
+            self.latest_box['grid'].itemAt(i).widget().setParent(None)
+
+        for i in range(min(4, len(data))):
+            self.oldest_box['grid'].addWidget(self.create_static_card(data[i], i, data), 0, i)
+        
+        latest_list = sorted(data, key=lambda x: x[1], reverse=True)
+        for i in range(min(4, len(latest_list))):
+            self.latest_box['grid'].addWidget(self.create_static_card(latest_list[i], i, latest_list), 0, i)
 
     def showEvent(self, event):
         super().showEvent(event)

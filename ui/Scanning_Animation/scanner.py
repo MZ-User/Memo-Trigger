@@ -1,20 +1,18 @@
 import os
-import json
+import sqlite3
 import time
 from PyQt6.QtCore import QThread, pyqtSignal
 
 class ImageScanner(QThread):
-    # Live file address bhejne ke liye signal
     progress_signal = pyqtSignal(str)
-    # Scanning khatam hone par results bhejne ke liye signal
     finished_signal = pyqtSignal(list)
 
     def __init__(self, paths_to_scan=None, extensions=None, callback=None):
         super().__init__()
         self.callback = callback
+        self.db_name = "memo_trigger.db"
         self.paths_to_scan = paths_to_scan if paths_to_scan else [os.path.expanduser("~")]
         
-        # Extension logic: .jpg aur .jpeg dono ko handle karega
         processed_extensions = []
         if extensions:
             for ext in extensions:
@@ -29,7 +27,20 @@ class ImageScanner(QThread):
             self.extensions = ('.jpg', '.jpeg', '.png', '.gif', '.bmp')
 
         self.found_files = []
-        self.is_finished = False
+
+    def init_db(self):
+        conn = sqlite3.connect(self.db_name)
+        cursor = conn.cursor()
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS scan_results (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                file_path TEXT NOT NULL,
+                timestamp REAL NOT NULL
+            )
+        ''')
+        cursor.execute("DELETE FROM scan_results")
+        conn.commit()
+        return conn
 
     def run(self):
         self.found_files = [] 
@@ -39,30 +50,27 @@ class ImageScanner(QThread):
                 continue
             
             for root, dirs, files in os.walk(target):
-                # Har folder ke andar ki files ko iterate karna
                 for file in files:
                     full_path = os.path.normpath(os.path.join(root, file))
-                    
-                    # --- LIVE EMIT: Har file ka path UI ko bhejna ---
                     self.progress_signal.emit(full_path)
-                    
-                    # Chota sa delay taake UI par path "flow" hota nazar aaye
-                    # Isse scanning ki real speed ka ehsas hoga
                     time.sleep(0.001) 
                     
                     if file.lower().endswith(self.extensions):
                         self.found_files.append(full_path)
         
-        # DB.json update
-        db_path = os.path.join(os.getcwd(), "DB.json")
         try:
-            with open(db_path, "w") as f:
-                json.dump({"images": self.found_files}, f, indent=4)
+            conn = self.init_db()
+            cursor = conn.cursor()
+            for path in self.found_files:
+                if os.path.exists(path):
+                    ts = os.path.getctime(path)
+                    cursor.execute("INSERT INTO scan_results (file_path, timestamp) VALUES (?, ?)", 
+                                   (path, ts))
+            conn.commit()
+            conn.close()
         except Exception as e:
-            print(f"Error saving DB: {e}")
+            print(f"Database Error: {e}")
 
-        self.is_finished = True
-        
         if self.callback:
             self.callback(self.found_files)
         

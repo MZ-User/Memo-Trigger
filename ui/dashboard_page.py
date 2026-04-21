@@ -156,13 +156,20 @@ class DashboardPage(QWidget):
             self.parent.show_options()
 
     def handle_exit_click(self):
-        db_path = os.path.join(os.getcwd(), "DB.json")
+        import sqlite3
+        db_path = os.path.join(os.getcwd(), "memo_trigger.db")
         try:
-            with open(db_path, "w") as f:
-                json.dump({"images": []}, f)
-        except: pass
-        os._exit(0)
+            if os.path.exists(db_path):
+                conn = sqlite3.connect(db_path)
+                cursor = conn.cursor()
 
+                cursor.execute("DELETE FROM scan_results")
+                conn.commit()
+                conn.close()
+        except Exception as e:
+            print(f"Exit Clean Error: {e}")
+            
+        os._exit(0)
     def eventFilter(self, obj, event):
         if isinstance(obj, QPushButton):
             if event.type() == QEvent.Type.Enter: self.set_btn_style(obj, "hover")

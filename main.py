@@ -4,7 +4,10 @@ from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget, QLabel
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QPixmap, QFontDatabase
 
-# Project root ko path mein add karna
+# Set High DPI Scaling Policy before creating QApplication
+if hasattr(Qt, 'HighDpiScaleFactorRoundingPolicy'):
+    QApplication.setHighDpiScaleFactorRoundingPolicy(Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
+
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from ui import SplashPage, DashboardPage, ResultsPage, OptionsPage
@@ -18,7 +21,7 @@ class SpendedMeApp(QMainWindow):
         
         self.base_dir = os.path.dirname(os.path.abspath(__file__))
         
-        # Font Loading
+        # Load Application Fonts
         font_path = os.path.join(self.base_dir, "static", "fonts", "Gwenchana.ttf")
         font_id = QFontDatabase.addApplicationFont(font_path)
         self.custom_font = QFontDatabase.applicationFontFamilies(font_id)[0] if font_id != -1 else "Impact"
@@ -26,7 +29,7 @@ class SpendedMeApp(QMainWindow):
         self.main_container = QWidget()
         self.setCentralWidget(self.main_container)
         
-        # Background
+        # Background Setup
         self.bg_label = QLabel(self.main_container)
         self.update_background()
 
@@ -72,7 +75,6 @@ class SpendedMeApp(QMainWindow):
         self.current_screen.resize(self.size())
         self.current_screen.show()
 
-    # UPDATED: Ab ye extensions bhi accept karta hai
     def trigger_animation(self, paths, extensions=None):
         self.clear_screen()
         self.current_screen = ScanningAnimationPage(self)
@@ -80,11 +82,9 @@ class SpendedMeApp(QMainWindow):
         self.current_screen.show()
         
         if hasattr(self.current_screen, 'start_scanning_process'):
-            # Dono parameters pass kar diye
             self.current_screen.start_scanning_process(paths, extensions)
 
     def show_results(self):
-        """Scanning khatam hone par redirect"""
         self.clear_screen()
         self.current_screen = ResultsPage(self)
         self.current_screen.resize(self.size())
